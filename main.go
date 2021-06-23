@@ -22,7 +22,7 @@ import (
 
 const (
 	missingForm        = "Missing form information"
-	emailNotValid      = "Email not validate"
+	emailNotValid      = "Email not valid"
 	slackURLMissing    = "SLACK_URL ENV var is missing"
 	redirectURLMissing = "REDIRECT_URL ENV var is missing"
 	geoliteDBMissing   = "GEOLITE_DB ENV var is missing"
