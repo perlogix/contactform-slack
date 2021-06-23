@@ -157,10 +157,11 @@ func sendSlack(d *submit) error {
 
 func findLocation(ip string) (*location, error) {
 	geolite, _ := getConfigs("geolite")
+	loc := &location{}
 
 	db, err := geoip2.Open(geolite)
 	if err != nil {
-		return nil, err
+		return loc, err
 	}
 
 	defer db.Close()
@@ -168,10 +169,9 @@ func findLocation(ip string) (*location, error) {
 	parseIP := net.ParseIP(ip)
 	record, err := db.City(parseIP)
 	if err != nil {
-		return nil, err
+		return loc, err
 	}
 
-	loc := &location{}
 	if city, ok := record.City.Names["en"]; ok {
 		loc.City = city
 	}
@@ -221,10 +221,10 @@ func signupRte(c echo.Context) error {
 
 		loc, err := findLocation(c.RealIP())
 		if err != nil {
-			data = &submit{Name: name, Email: email, Message: message, Browser: browser, Mobile: mobile}
-		} else {
-			data = &submit{Name: name, Email: email, Message: message, Browser: browser, Mobile: mobile, City: loc.City, State: loc.State, Country: loc.Country}
+			log.Println(err)
 		}
+
+		data = &submit{Name: name, Email: email, Message: message, Browser: browser, Mobile: mobile, City: loc.City, State: loc.State, Country: loc.Country}
 
 		err = sendSlack(data)
 		if err != nil {
