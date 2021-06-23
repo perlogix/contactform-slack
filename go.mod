@@ -3,7 +3,6 @@ module github.com/perlogix/contactform-slack
 go 1.16
 
 require (
-	github.com/client9/misspell v0.3.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/goware/emailx v0.2.0
 	github.com/labstack/echo/v4 v4.3.0
