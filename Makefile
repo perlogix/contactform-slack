@@ -30,7 +30,7 @@ fmt:
 	go fmt ./...
 
 lint: fmt
-	$(GOPATH)/bin/golint $(PACKAGES)
+	$(GOPATH)/bin/staticcheck $(PACKAGES)
 	$(GOPATH)/bin/golangci-lint run
 	$(GOPATH)/bin/gosec -quiet -no-fail ./...
 

@@ -16,6 +16,8 @@ Send contact form input to Slack with email validation and GeoLite2 information
 
 # Example Slack Message Contents
 
+`URL:` localhost:8080/contact
+
 `Name:` Tim Ski
 
 `Email:` tim@someemail.com

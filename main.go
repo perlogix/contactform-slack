@@ -17,6 +17,7 @@ import (
 	echo "github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/mssola/user_agent"
+	cmap "github.com/orcaman/concurrent-map"
 	geoip2 "github.com/oschwald/geoip2-golang"
 )
 
@@ -26,6 +27,7 @@ const (
 	slackURLMissing    = "SLACK_URL ENV var is missing"
 	redirectURLMissing = "REDIRECT_URL ENV var is missing"
 	geoliteDBMissing   = "GEOLITE_DB ENV var is missing"
+	mapSize            = 100
 )
 
 var (
@@ -42,6 +44,7 @@ var (
 	}
 	curves           = []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256}
 	blackListDomains = []string{"monkeydigital.co", "aol.com", "att.net", "comcast.net", "facebook.com", "gmail.com", "gmx.com", "googlemail.com", "google.com", "hotmail.com", "hotmail.co.uk", "mac.com", "me.com", "mail.com", "msn.com", "live.com", "sbcglobal.net", "verizon.net", "yahoo.com", "yahoo.co.uk", "email.com", "fastmail.fm", "games.com", "gmx.net", "hush.com", "hushmail.com", "icloud.com", "iname.com", "inbox.com", "lavabit.com", "love.com", "outlook.com", "pobox.com", "protonmail.ch", "protonmail.com", "tutanota.de", "tutanota.com", "tutamail.com", "tuta.io", "keemail.me", "rocketmail.com", "safe-mail.net", "wow.com", "ygm.com", "ymail.com", "zoho.com", "yandex.com", "bellsouth.net", "charter.net", "cox.net", "earthlink.net", "juno.com", "btinternet.com", "virginmedia.com", "blueyonder.co.uk", "live.co.uk", "ntlworld.com", "orange.net", "sky.com", "talktalk.co.uk", "tiscali.co.uk", "virgin.net", "bt.com", "sina.com", "sina.cn", "qq.com", "naver.com", "hanmail.net", "daum.net", "nate.com", "yahoo.co.jp", "yahoo.co.kr", "yahoo.co.id", "yahoo.co.in", "yahoo.com.sg", "yahoo.com.ph", "163.com", "yeah.net", "126.com", "21cn.com", "aliyun.com", "foxmail.com", "hotmail.fr", "live.fr", "laposte.net", "yahoo.fr", "wanadoo.fr", "orange.fr", "gmx.fr", "sfr.fr", "neuf.fr", "free.fr", "gmx.de", "hotmail.de", "live.de", "online.de", "t-online.de", "web.de", "yahoo.de", "libero.it", "virgilio.it", "hotmail.it", "aol.it", "tiscali.it", "alice.it", "live.it", "yahoo.it", "email.it", "tin.it", "poste.it", "teletu.it", "bk.ru", "inbox.ru", "list.ru", "mail.ru", "rambler.ru", "yandex.by", "yandex.com", "yandex.kz", "yandex.ru", "yandex.ua", "ya.ru", "hotmail.be", "live.be", "skynet.be", "voo.be", "tvcablenet.be", "telenet.be", "hotmail.com.ar", "live.com.ar", "yahoo.com.ar", "fibertel.com.ar", "speedy.com.ar", "arnet.com.ar", "yahoo.com.mx", "live.com.mx", "hotmail.es", "hotmail.com.mx", "prodigy.net.mx", "yahoo.ca", "hotmail.ca", "bell.net", "shaw.ca", "sympatico.ca", "rogers.com", "yahoo.com.br", "hotmail.com.br", "outlook.com.br", "uol.com.br", "bol.com.br", "terra.com.br", "ig.com.br", "r7.com", "zipmail.com.br", "globo.com", "globomail.com", "oi.com.br"}
+	emailMap         = cmap.New()
 )
 
 func init() {
@@ -80,6 +83,7 @@ type submit struct {
 	Country string `json:"country"`
 	Mobile  bool   `json:"mobile"`
 	Browser string `json:"browser"`
+	URL     string `json:"url"`
 }
 
 type slackAttachment struct {
@@ -120,9 +124,20 @@ func getConfigs(c string) (string, error) {
 	return "", nil
 }
 
+func emailPresent(email string) bool {
+	if !emailMap.Has(email) {
+		if emailMap.Count() > mapSize {
+			emailMap.Clear()
+		}
+		emailMap.Set(email, "")
+		return false
+	}
+	return true
+}
+
 func sendSlack(d *submit) error {
 	payload := slackItem{
-		Text:        fmt.Sprintf("Name: %s, Email: %s, Message: %s, Browser: %s, Mobile: %t, Country: %s, City: %s, State: %s", d.Name, d.Email, d.Message, d.Browser, d.Mobile, d.Country, d.City, d.State),
+		Text:        fmt.Sprintf("URL: %s, Name: %s, Email: %s, Message: %s, Browser: %s, Mobile: %t, Country: %s, City: %s, State: %s", d.URL, d.Name, d.Email, d.Message, d.Browser, d.Mobile, d.Country, d.City, d.State),
 		Attachments: []slackAttachment{},
 	}
 
@@ -200,12 +215,16 @@ func signupRte(c echo.Context) error {
 
 	redirect, _ := getConfigs("redirect")
 
-	if name != "" && email != "" && message != "" {
+	if name != "" && email != "" {
 		emailDomain := strings.Split(email, "@")[1]
 		for _, e := range blackListDomains {
 			if emailDomain == e {
 				return c.Redirect(301, redirect)
 			}
+		}
+
+		if emailPresent(email) {
+			return c.Redirect(301, redirect)
 		}
 
 		agent := c.Request().Header.Get("User-Agent")
@@ -224,7 +243,9 @@ func signupRte(c echo.Context) error {
 			log.Println(err)
 		}
 
-		data = &submit{Name: name, Email: email, Message: message, Browser: browser, Mobile: mobile, City: loc.City, State: loc.State, Country: loc.Country}
+		url := c.Request().Host + c.Request().URL.String()
+
+		data = &submit{Name: name, Email: email, Message: message, Browser: browser, Mobile: mobile, City: loc.City, State: loc.State, Country: loc.Country, URL: url}
 
 		err = sendSlack(data)
 		if err != nil {
