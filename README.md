@@ -7,7 +7,7 @@ Send contact form input to Slack with email validation and GeoLite2 information
 
 - Small web service
 - Validate email string
-- Block cURL requests
+- Block bad user-agent requests
 - JSON error messages
 - Block free email addresses
 - Parse GeoLite2 info for Slack message
